@@ -1,0 +1,60 @@
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+
+#define GAS_SENSOR_PIN A0      // Analog pin connected to the MQ-5 sensor
+#define BUZZER_PIN 7           // Digital pin connected to the buzzer
+#define RELAY_PIN 8            // Digital pin connected to the relay
+#define GAS_THRESHOLD 200      // Gas concentration threshold in PPM
+#define GSM_RX_PIN 10          // Digital pin connected to GSM module RX
+#define GSM_TX_PIN 11          // Digital pin connected to GSM module TX
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2); // LCD pins (RS, E, D4, D5, D6, D7)
+SoftwareSerial gsmSerial(GSM_RX_PIN, GSM_TX_PIN);
+
+void setup() {
+  Serial.begin(9600);
+  gsmSerial.begin(9600);
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+
+  lcd.begin(16, 2); // Initialize LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Gas Detection");
+}
+
+void loop() {
+  int gasValue = analogRead(GAS_SENSOR_PIN); // Read gas sensor value
+  int ppm = map(gasValue, 0, 1023, 0, 5000);  // Convert to PPM
+
+  lcd.setCursor(0, 1);
+  lcd.print("Gas (PPM): ");
+  lcd.print(ppm);
+
+  if (ppm > GAS_THRESHOLD) {
+    lcd.setCursor(0, 0);
+    lcd.print("Gas Leakage!");
+
+    digitalWrite(BUZZER_PIN, HIGH); // Activate buzzer
+    digitalWrite(RELAY_PIN, HIGH);  // Activate relay (optional)
+
+    sendSMS("Gas Leakage Alert!"); // Send SMS
+  } else {
+    digitalWrite(BUZZER_PIN, LOW);  // Deactivate buzzer
+    digitalWrite(RELAY_PIN, LOW);   // Deactivate relay (optional)
+  }
+
+  delay(1000); // Delay between readings
+}
+
+void sendSMS(String message) {
+  gsmSerial.println("AT+CMGF=1"); // Set SMS mode to text
+  delay(100);
+  gsmSerial.println("AT+CMGS=\"+1234567890\""); // Replace with your phone number
+  delay(100);
+  gsmSerial.println(message);
+  delay(100);
+  gsmSerial.println((char)26); // End of message character
+  delay(100);
+  gsmSerial.println();
+}
